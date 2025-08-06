@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from openai import OpenAI
-from app.database import SessionLocal
+from database import SessionLocal
 from app.models import Meal
 
 router = APIRouter()
