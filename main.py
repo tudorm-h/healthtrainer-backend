@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from app.routes import upload
-from app.database import init_db
+from routes import upload
+from database import init_db
 from fastapi.staticfiles import StaticFiles
 import os
 
