@@ -7,7 +7,8 @@ from fastapi import APIRouter, UploadFile, File, Form, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-from openai import OpenAI
+import openai
+
 from database import SessionLocal
 from models import Meal
 
@@ -17,9 +18,9 @@ load_dotenv()
 UPLOAD_DIR = "uploaded_images"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Dependency
+# Dependency for DB session
 def get_db():
     db = SessionLocal()
     try:
@@ -27,7 +28,7 @@ def get_db():
     finally:
         db.close()
 
-# GET /upload/ to fetch all meals
+# GET /upload/ to fetch all saved meals
 @router.get("/")
 def read_meals(db: Session = Depends(get_db)):
     meals = db.query(Meal).order_by(Meal.timestamp.desc()).all()
@@ -44,13 +45,14 @@ def read_meals(db: Session = Depends(get_db)):
         for meal in meals
     ]
 
-# POST /upload/ to upload and analyse image
+# POST /upload/ to upload and analyze a meal image
 @router.post("/")
 async def upload_image(
     file: UploadFile = File(...),
     context: str = Form(default="")
 ):
     try:
+        # Save uploaded file
         timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
         filename = f"{timestamp}_{file.filename}"
         file_path = os.path.join(UPLOAD_DIR, filename)
@@ -60,9 +62,11 @@ async def upload_image(
 
         print(f"Saved file to {file_path}")
 
+        # Encode image to base64
         with open(file_path, "rb") as image_file:
             encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
 
+        # Compose prompt
         base_prompt = (
             "You're a nutritionist. Identify the food in this photo "
             "and respond ONLY with valid JSON in this format:\n"
@@ -79,7 +83,8 @@ async def upload_image(
         if context.strip():
             full_prompt += f"\n\nAdditional context from the user: \"{context.strip()}\""
 
-        response = client.chat.completions.create(
+        # Call OpenAI (GPT-4 with vision)
+        response = openai.ChatCompletion.create(
             model="gpt-4o",
             messages=[
                 {
@@ -94,15 +99,17 @@ async def upload_image(
             temperature=0.2,
         )
 
-        gpt_output = response.choices[0].message.content.strip()
+        gpt_output = response.choices[0].message["content"].strip()
         print("GPT Output:\n", gpt_output)
 
+        # Clean up any extra formatting
         if gpt_output.startswith("```"):
             gpt_output = gpt_output.strip("```json").strip("```").strip()
 
         result = json.loads(gpt_output)
         result["filename"] = filename
 
+        # Save to DB
         db = SessionLocal()
         try:
             meal = Meal(
