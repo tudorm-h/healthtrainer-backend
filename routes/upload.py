@@ -3,7 +3,7 @@ import shutil
 import base64
 import json
 from datetime import datetime
-from fastapi import APIRouter, UploadFile, File, Form, Depends
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
@@ -130,3 +130,25 @@ async def upload_image(
     except Exception as e:
         print("AI processing failed:", e)
         return JSONResponse(content={"error": str(e)}, status_code=500)
+
+# DELETE /upload/meals/{filename} to delete a meal
+@router.delete("/meals/{filename}")
+def delete_meal(filename: str, db: Session = Depends(get_db)):
+    # Step 1: Delete image file
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    if os.path.exists(file_path):
+        os.remove(file_path)
+        print(f"🗑️ Deleted file: {file_path}")
+    else:
+        print(f"⚠️ File not found: {file_path}")
+
+    # Step 2: Delete from DB
+    meal = db.query(Meal).filter(Meal.filename == filename).first()
+    if not meal:
+        raise HTTPException(status_code=404, detail="Meal not found in database")
+
+    db.delete(meal)
+    db.commit()
+    print(f"✅ Deleted DB record for: {filename}")
+
+    return {"message": f"{filename} deleted successfully"}
