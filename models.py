@@ -1,9 +1,9 @@
-
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, Index
 from sqlalchemy.ext.declarative import declarative_base
-import datetime
+from datetime import datetime, timezone
 
 Base = declarative_base()
+
 
 class Meal(Base):
     __tablename__ = "meals"
@@ -15,4 +15,9 @@ class Meal(Base):
     protein_g = Column(Float)
     carbs_g = Column(Float)
     fat_g = Column(Float)
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Index on timestamp for fast ordered queries
+    __table_args__ = (
+        Index("ix_meals_timestamp", "timestamp"),
+    )

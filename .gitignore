@@ -1,1 +1,7 @@
 .env
+*.db
+__pycache__/
+*.py[cod]
+.DS_Store
+uploaded_images/*
+!uploaded_images/.gitkeep
